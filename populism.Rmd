@@ -23,4 +23,80 @@ x <- trains %>%
 
 
 
+What is the causal effect of the treatment on the probability of becoming more populist?
+
+-compare treatment to control 
+-what population is he asking about? sample would have to be representative of the population
+-small sample size (115)
+
+Fit Model:
+move_to_pop ~ treatment
+y_i = beta_0 + beta_1 * treatment + epsilon_i
+
+```{r}
+
+fit_1 <- stan_glm(data = x,
+                  formula = move_to_pop ~ treatment,
+                  family = binomial, 
+                  refresh = 0,
+                  seed = 65)
+```
+
+```{r}
+
+newobs <- tibble(treatment = c("Treated", "Control"))
+
+pe <- posterior_epred(fit_1, 
+                      newdata = newobs) %>% 
+  as_tibble() %>%
+  mutate(ate = `1` - `2`)
+
+```
+
+```{r}
+
+pe %>% 
+  ggplot(aes(x = ate)) +
+    geom_histogram(aes(y = after_stat(count/sum(count))),
+                   bins = 100) +
+    labs(title = "Posterior for Average Treatment Effect",
+         subtitle = "Treatment makes people about 20% more likely to be populist",
+         x = "Difference in Attitude",
+         y = "Probability") +
+    scale_y_continuous(labels = scales::percent_format()) +
+    theme_classic()
+
+pe
+
+```
+
+If we assign the treatment to 25 people, how many will become more populist?
+
+```{r}
+newobs1 <- tibble(treatment = c(rep("Treated", 25)))
+
+pp <- posterior_predict(fit_1, 
+                        newdata = newobs1) %>%
+    as_tibble() %>%
+    mutate_all(as.numeric) %>%
+    rowwise() %>% 
+    mutate(total = sum(c_across()))
+  
+pp
+```
+
+
+```{r}
+pp %>% 
+  ggplot(aes(x = total)) +
+    geom_histogram(aes(y = after_stat(count/sum(count))),
+                   bins = 100)  +
+    labs(title = "Posterior for Number of People who Became More Populist",
+         subtitle = "Likely that 10 of the next 25 become more populist",
+         x = "Number",
+         y = "Probability") +
+    scale_x_continuous(labels = scales::number_format(accuracy = 1)) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    theme_classic()
+```
 
